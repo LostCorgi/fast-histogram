@@ -806,11 +806,11 @@ static PyObject *_histogram1d_weighted(PyObject *self, PyObject *args) {
 }
 
 static PyObject *_histogram2d_weighted(PyObject *self, PyObject *args) {
-
+  /* added nowt_obj, a clone of count_obj except it adds 1 instead of the weight. mimics the histogram2d in fortran */
   long n;
   int ix, iy, nx, ny;
   double xmin, xmax, tx, fnx, normx, ymin, ymax, ty, fny, normy, tw;
-  PyObject *x_obj, *y_obj, *w_obj, *count_obj;
+  PyObject *x_obj, *y_obj, *w_obj, *count_obj, *nowt_obj;
   PyArrayObject *x_array, *y_array, *w_array, *count_array, *arrays[3];
   npy_intp dims[2];
   double *count;
@@ -857,24 +857,29 @@ static PyObject *_histogram2d_weighted(PyObject *self, PyObject *args) {
   dims[0] = nx;
   dims[1] = ny;
   count_obj = PyArray_SimpleNew(2, dims, NPY_DOUBLE);
-  if (count_obj == NULL) {
+  nowt_obj = PyArray_SimpleNew(2, dims, NPY_DOUBLE);
+  
+  if (count_obj == NULL || nowt_obj == NULL) {
     PyErr_SetString(PyExc_RuntimeError, "Couldn't build output array");
     Py_DECREF(x_array);
     Py_DECREF(y_array);
     Py_DECREF(w_array);
     Py_XDECREF(count_obj);
+    Py_XDECREF(nowt_obj);
     return NULL;
   }
 
   count_array = (PyArrayObject *)count_obj;
+  nowt_array = (PyArrayObject *)nowt_obj;
 
   PyArray_FILLWBYTE(count_array, 0);
+  PyArray_FILLWBYTE(nowt_array, 0);
 
   if (n == 0) {
     Py_DECREF(x_array);
     Py_DECREF(y_array);
     Py_DECREF(w_array);
-    return count_obj;
+    return PyTuple_Pack(2, count_obj, nowt_obj);
   }
 
   arrays[0] = x_array;
@@ -890,7 +895,9 @@ static PyObject *_histogram2d_weighted(PyObject *self, PyObject *args) {
     Py_DECREF(y_array);
     Py_DECREF(w_array);
     Py_DECREF(count_obj);
+    Py_DECREF(nowt_obj);
     Py_DECREF(count_array);
+    Py_DECREF(nowt_array);
     return NULL;
   }
 
@@ -906,7 +913,9 @@ static PyObject *_histogram2d_weighted(PyObject *self, PyObject *args) {
     Py_DECREF(y_array);
     Py_DECREF(w_array);
     Py_DECREF(count_obj);
+    Py_DECREF(nowt_obj);
     Py_DECREF(count_array);
+    Py_DECREF(nowt_array);
     return NULL;
   }
 
@@ -927,6 +936,7 @@ static PyObject *_histogram2d_weighted(PyObject *self, PyObject *args) {
 
   /* Get C array for output array */
   count = (double *)PyArray_DATA(count_array);
+  nowt = (double *)PyArray_DATA(nowt_array);
 
   Py_BEGIN_ALLOW_THREADS
 
@@ -951,6 +961,7 @@ static PyObject *_histogram2d_weighted(PyObject *self, PyObject *args) {
         if(ix == nx) ix -= 1;
         if(iy == ny) iy -= 1;
         count[iy + ny * ix] += tw;
+        nowt[iy + ny * ix] += 1;
       }
 
       dataptr[0] += stride0;
@@ -969,7 +980,7 @@ static PyObject *_histogram2d_weighted(PyObject *self, PyObject *args) {
   Py_DECREF(y_array);
   Py_DECREF(w_array);
 
-  return count_obj;
+  return PyTuple_Pack(2, count_obj, nowt_obj);
 }
 
 static PyObject *_histogramdd_weighted(PyObject *self, PyObject *args) {
