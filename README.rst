@@ -1,3 +1,5 @@
+Modification for the purpose of recreating a fortran function used in GSASII that returns both a weighted and unweighted array from the same histogram function to reduce looping
+
 |CI Status| |asv| |PyPI|
 
 About
